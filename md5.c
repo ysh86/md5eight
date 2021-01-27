@@ -28,7 +28,6 @@
 
 struct MD5Context {
 	uint32_t buf[4];
-	uint32_t bits[2];
 	unsigned char in[64];
 };
 
@@ -67,9 +66,6 @@ MD5Init(struct MD5Context *ctx)
 	ctx->buf[1] = 0xefcdab89;
 	ctx->buf[2] = 0x98badcfe;
 	ctx->buf[3] = 0x10325476;
-
-	ctx->bits[0] = 0;
-	ctx->bits[1] = 0;
 }
 
 /*
@@ -77,40 +73,12 @@ MD5Init(struct MD5Context *ctx)
  * of bytes.
  */
 void
-MD5Update(struct MD5Context *ctx, unsigned char const *buf, unsigned len)
+MD5Update(struct MD5Context *ctx, unsigned char const *buf, uint32_t len)
 {
-	uint32_t t;
-
-	/* Update bitcount */
-
-	t = ctx->bits[0];
-	if ((ctx->bits[0] = (t + ((uint32_t)len << 3)) & 0xffffffff) < t)
-		ctx->bits[1]++;	/* Carry from low to high */
-	ctx->bits[1] += len >> 29;
-
-	t = (t >> 3) & 0x3f;	/* Bytes already in shsInfo->data */
-
-	/* Handle any leading odd-sized chunks */
-
-	if ( t ) {
-		unsigned char *p = ctx->in + t;
-
-		t = 64-t;
-		if (len < t) {
-			memcpy(p, buf, len);
-			return;
-		}
-		memcpy(p, buf, t);
-		MD5Transform(ctx->buf, ctx->in);
-		buf += t;
-		len -= t;
-	}
-
 	/* Process data in 64-byte chunks */
 
 	while (len >= 64) {
-		memcpy(ctx->in, buf, 64);
-		MD5Transform(ctx->buf, ctx->in);
+		MD5Transform(ctx->buf, buf);
 		buf += 64;
 		len -= 64;
 	}
@@ -125,13 +93,13 @@ MD5Update(struct MD5Context *ctx, unsigned char const *buf, unsigned len)
  * 1 0* (64-bit count of bits processed, MSB-first)
  */
 void
-MD5Final(unsigned char digest[16], struct MD5Context *ctx)
+MD5Final(unsigned char digest[16], struct MD5Context *ctx, uint32_t len)
 {
 	unsigned count;
 	unsigned char *p;
 
 	/* Compute number of bytes mod 64 */
-	count = (ctx->bits[0] >> 3) & 0x3F;
+	count = len & 0x3F;
 
 	/* Set the first char of padding to 0x80.  This is safe since there is
 	   always at least one byte free */
@@ -155,15 +123,14 @@ MD5Final(unsigned char digest[16], struct MD5Context *ctx)
 	}
 
 	/* Append length in bits and transform */
-	putu32(ctx->bits[0], ctx->in + 56);
-	putu32(ctx->bits[1], ctx->in + 60);
-
+	putu32((len << 3) & 0xffffffff, ctx->in + 56);
+	putu32(len >> 29, ctx->in + 60);
 	MD5Transform(ctx->buf, ctx->in);
+
 	putu32(ctx->buf[0], digest);
 	putu32(ctx->buf[1], digest + 4);
 	putu32(ctx->buf[2], digest + 8);
 	putu32(ctx->buf[3], digest + 12);
-	memset(ctx, 0, sizeof(*ctx));	/* In case it's sensitive */
 }
 
 /* The four core functions - F1 is optimized somewhat */
@@ -285,6 +252,7 @@ main (int argc, char **argv)
 	unsigned char checksum[16];
 	int i;
 	int j;
+	uint32_t len;
 
 	if (argc < 2)
 	{
@@ -295,8 +263,9 @@ main (int argc, char **argv)
 	{
 		printf ("MD5 (\"%s\") = ", argv[j]);
 		MD5Init (&context);
-		MD5Update (&context, (unsigned char const *) argv[j], strlen (argv[j]));
-		MD5Final (checksum, &context);
+		len = strlen (argv[j]);
+		MD5Update (&context, (unsigned char const *) argv[j], len);
+		MD5Final (checksum, &context, len);
 		for (i = 0; i < 16; i++)
 		{
 			printf ("%02x", (unsigned int) checksum[i]);
