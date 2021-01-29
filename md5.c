@@ -26,46 +26,24 @@
 #include <string.h>	/* for memcpy() */
 #include <stdint.h>
 
-struct MD5Context {
-	uint32_t buf[4];
-	unsigned char in[64];
-};
+/* struct MD5Context { */
+	uint8_t digest[4*4]; /* uint32_t le x4 */
+	uint8_t buf[64];
+/* }; */
 
-void MD5Transform (uint32_t buf[4], const unsigned char in[64]);
-
-/* Little-endian byte-swapping routines.  Note that these do not
-   depend on the size of datatypes such as uint32_t, nor do they require
-   us to detect the endianness of the machine we are running on.  It
-   is possible they should be macros for speed, but I would be
-   surprised if they were a performance bottleneck for MD5.  */
-
-static uint32_t
-getu32 (const unsigned char *addr)
-{
-	return (((((unsigned long)addr[3] << 8) | addr[2]) << 8)
-		| addr[1]) << 8 | addr[0];
-}
-
-static void
-putu32 (uint32_t data, unsigned char *addr)
-{
-	addr[0] = (unsigned char)data;
-	addr[1] = (unsigned char)(data >> 8);
-	addr[2] = (unsigned char)(data >> 16);
-	addr[3] = (unsigned char)(data >> 24);
-}
+void MD5Transform (const uint8_t inraw[64]);
 
 /*
  * Start MD5 accumulation.  Set bit count to 0 and buffer to mysterious
  * initialization constants.
  */
 void
-MD5Init(struct MD5Context *ctx)
+MD5Init()
 {
-	ctx->buf[0] = 0x67452301;
-	ctx->buf[1] = 0xefcdab89;
-	ctx->buf[2] = 0x98badcfe;
-	ctx->buf[3] = 0x10325476;
+	digest[4*0+3] = 0x67; digest[4*0+2] = 0x45; digest[4*0+1] = 0x23; digest[4*0+0] = 0x01;
+	digest[4*1+3] = 0xef; digest[4*1+2] = 0xcd; digest[4*1+1] = 0xab; digest[4*1+0] = 0x89;
+	digest[4*2+3] = 0x98; digest[4*2+2] = 0xba; digest[4*2+1] = 0xdc; digest[4*2+0] = 0xfe;
+	digest[4*3+3] = 0x10; digest[4*3+2] = 0x32; digest[4*3+1] = 0x54; digest[4*3+0] = 0x76;
 }
 
 /*
@@ -73,19 +51,19 @@ MD5Init(struct MD5Context *ctx)
  * of bytes.
  */
 void
-MD5Update(struct MD5Context *ctx, unsigned char const *buf, uint32_t len)
+MD5Update(const uint8_t *in, uint32_t len)
 {
 	/* Process data in 64-byte chunks */
 
 	while (len >= 64) {
-		MD5Transform(ctx->buf, buf);
-		buf += 64;
+		MD5Transform(in);
+		in += 64;
 		len -= 64;
 	}
 
 	/* Handle any remaining bytes of data. */
 
-	memcpy(ctx->in, buf, len);
+	memcpy(buf, in, len);
 }
 
 /*
@@ -93,17 +71,19 @@ MD5Update(struct MD5Context *ctx, unsigned char const *buf, uint32_t len)
  * 1 0* (64-bit count of bits processed, MSB-first)
  */
 void
-MD5Final(unsigned char digest[16], struct MD5Context *ctx, uint32_t len)
+MD5Final(uint32_t len)
 {
-	unsigned count;
-	unsigned char *p;
+	uint8_t count;
+	uint8_t *p;
+	uint32_t len_lo;
+	uint32_t len_hi;
 
 	/* Compute number of bytes mod 64 */
 	count = len & 0x3F;
 
 	/* Set the first char of padding to 0x80.  This is safe since there is
 	   always at least one byte free */
-	p = ctx->in + count;
+	p = buf + count;
 	*p++ = 0x80;
 
 	/* Bytes of padding needed to make 64 bytes */
@@ -113,24 +93,22 @@ MD5Final(unsigned char digest[16], struct MD5Context *ctx, uint32_t len)
 	if (count < 8) {
 		/* Two lots of padding:  Pad the first block to 64 bytes */
 		memset(p, 0, count);
-		MD5Transform(ctx->buf, ctx->in);
+		MD5Transform(buf);
 
 		/* Now fill the next block with 56 bytes */
-		memset(ctx->in, 0, 56);
+		memset(buf, 0, 56);
 	} else {
 		/* Pad block to 56 bytes */
 		memset(p, 0, count-8);
 	}
 
 	/* Append length in bits and transform */
-	putu32((len << 3) & 0xffffffff, ctx->in + 56);
-	putu32(len >> 29, ctx->in + 60);
-	MD5Transform(ctx->buf, ctx->in);
 
-	putu32(ctx->buf[0], digest);
-	putu32(ctx->buf[1], digest + 4);
-	putu32(ctx->buf[2], digest + 8);
-	putu32(ctx->buf[3], digest + 12);
+	len_lo = (len << 3) & 0xffffffff;
+	len_hi = len >> 29;
+	buf[56+0] = len_lo; buf[56+1] = len_lo >> 8; buf[56+2] = len_lo >> 16; buf[56+3] = len_lo >> 24;
+	buf[60+0] = len_hi; buf[60+1] = len_hi >> 8; buf[60+2] = len_hi >> 16; buf[60+3] = len_hi >> 24;
+	MD5Transform(buf);
 }
 
 /* This is the central step in the MD5 algorithm. */
@@ -173,19 +151,22 @@ uint32_t MD5STEP_F4(uint32_t w, uint32_t x, uint32_t y, uint32_t z, uint32_t dat
  * the data and converts bytes into longwords for this routine.
  */
 void
-MD5Transform(uint32_t buf[4], const unsigned char inraw[64])
+MD5Transform(const uint8_t inraw[64])
 {
+	const uint8_t *addr;
 	uint32_t a, b, c, d;
 	uint32_t in[16];
 	int i;
 
-	for (i = 0; i < 16; ++i)
-		in[i] = getu32 (inraw + 4 * i);
+	for (i = 0; i < 16; ++i) {
+		addr = inraw + 4 * i;
+		in[i] = (((((uint32_t)addr[3] << 8) | addr[2]) << 8) | addr[1]) << 8 | addr[0];
+	}
 
-	a = buf[0];
-	b = buf[1];
-	c = buf[2];
-	d = buf[3];
+	a = *(uint32_t *)(&digest[0]);
+	b = *(uint32_t *)(&digest[4]);
+	c = *(uint32_t *)(&digest[8]);
+	d = *(uint32_t *)(&digest[12]);
 
 	a = MD5STEP_F1(a, b, c, d, in[ 0]+0xd76aa478,  7);
 	d = MD5STEP_F1(d, a, b, c, in[ 1]+0xe8c7b756, 12);
@@ -255,10 +236,10 @@ MD5Transform(uint32_t buf[4], const unsigned char inraw[64])
 	c = MD5STEP_F4(c, d, a, b, in[ 2]+0x2ad7d2bb, 15);
 	b = MD5STEP_F4(b, c, d, a, in[ 9]+0xeb86d391, 21);
 
-	buf[0] += a;
-	buf[1] += b;
-	buf[2] += c;
-	buf[3] += d;
+	*(uint32_t *)(&digest[0])  += a;
+	*(uint32_t *)(&digest[4])  += b;
+	*(uint32_t *)(&digest[8])  += c;
+	*(uint32_t *)(&digest[12]) += d;
 }
 
 
@@ -270,8 +251,6 @@ MD5Transform(uint32_t buf[4], const unsigned char inraw[64])
 int
 main (int argc, char **argv)
 {
-	struct MD5Context context;
-	unsigned char checksum[16];
 	int i;
 	int j;
 	uint32_t len;
@@ -284,13 +263,13 @@ main (int argc, char **argv)
 	for (j = 1; j < argc; ++j)
 	{
 		printf ("MD5 (\"%s\") = ", argv[j]);
-		MD5Init (&context);
+		MD5Init ();
 		len = strlen (argv[j]);
-		MD5Update (&context, (unsigned char const *) argv[j], len);
-		MD5Final (checksum, &context, len);
+		MD5Update ((const uint8_t *) argv[j], len);
+		MD5Final (len);
 		for (i = 0; i < 16; i++)
 		{
-			printf ("%02x", (unsigned int) checksum[i]);
+			printf ("%02x", digest[i]);
 		}
 		printf ("\n");
 	}
