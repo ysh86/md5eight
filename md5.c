@@ -104,7 +104,7 @@ MD5Final(uint32_t len)
 
 	/* Append length in bits and transform */
 
-	len_lo = (len << 3) & 0xffffffff;
+	len_lo = len << 3;
 	len_hi = len >> 29;
 	buf[56+0] = len_lo; buf[56+1] = len_lo >> 8; buf[56+2] = len_lo >> 16; buf[56+3] = len_lo >> 24;
 	buf[60+0] = len_hi; buf[60+1] = len_hi >> 8; buf[60+2] = len_hi >> 16; buf[60+3] = len_hi >> 24;
@@ -184,23 +184,64 @@ static uint8_t F4CONST[] = {
 0x2a,0xd7,0xd2,0xbb,
 0xeb,0x86,0xd3,0x91,
 };
-void MD5STEP(uint8_t w[4], uint8_t t[4], const uint8_t data[4], uint8_t cnst[4], uint8_t x[4], uint8_t s)
+uint8_t *add32(uint8_t a[4], const uint8_t b[4])
 {
-	uint32_t ww = (w[0] | (w[1] << 8) | (w[2] << 16) | (w[3] << 24));
-	uint32_t tt = (t[0] | (t[1] << 8) | (t[2] << 16) | (t[3] << 24));
-	uint32_t dd = (data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24));
-	uint32_t cc = (cnst[3] | (cnst[2] << 8) | (cnst[1] << 16) | (cnst[0] << 24));
-	uint32_t xx = (x[0] | (x[1] << 8) | (x[2] << 16) | (x[3] << 24));
+	uint8_t t;
+	uint8_t c;
 
-	ww += tt + dd + cc;
-	//ww &= 0xffffffff;
-	ww = ww<<s | ww>>(32-s);
-	ww += xx;
+	t = a[0] + b[0];
+	c = (t < a[0]) ? 1 : 0;
+	a[0] = t;
 
-	w[0] = ww;
-	w[1] = ww >> 8;
-	w[2] = ww >> 16;
-	w[3] = ww >> 24;
+	t = a[1] + b[1] + c;
+	if (c == 0) {
+		c = (t < a[1]) ? 1 : 0;
+	} else {
+		c = (t <= a[1]) ? 1 : 0;
+	}
+	a[1] = t;
+
+	t = a[2] + b[2] + c;
+	if (c == 0) {
+		c = (t < a[2]) ? 1 : 0;
+	} else {
+		c = (t <= a[2]) ? 1 : 0;
+	}
+	a[2] = t;
+
+	a[3] = a[3] + b[3] + c;
+
+	return a;
+}
+void rotate32(uint8_t a[4], uint8_t left)
+{
+	uint8_t l = left >> 3;
+	uint8_t rm = left & 7;
+	uint8_t t, tt;
+
+	while (l > 0) {
+		t = a[3];
+		a[3] = a[2];
+		a[2] = a[1];
+		a[1] = a[0];
+		a[0] = t;
+		--l;
+	}
+
+	t = a[0] >> (8-rm);
+	a[0] = (a[0]<<rm) | (a[3] >> (8-rm));
+	tt = a[1] >> (8-rm);
+	a[1] = (a[1]<<rm) | t;
+	t = a[2] >> (8-rm);
+	a[2] = (a[2]<<rm) | tt;
+	a[3] = (a[3]<<rm) | t;
+}
+void MD5STEP(uint8_t w[4], uint8_t t[4], const uint8_t data[4], const uint8_t cnst[4], const uint8_t x[4], uint8_t s)
+{
+	const uint8_t c[] = {cnst[3], cnst[2], cnst[1], cnst[0]};
+	add32(w, add32(add32(t, data), c));
+	rotate32(w, s);
+	add32(w, x);
 }
 void MD5STEP_F1(uint8_t w[4], uint8_t x[4], uint8_t y[4], uint8_t z[4], const uint8_t data[4], uint8_t cnst[4], uint8_t s)
 {
@@ -324,10 +365,10 @@ MD5Transform(const uint8_t in[64])
 	MD5STEP_F4(c, d, a, b, &in[ 2*4], &F4CONST[14*4], 15);
 	MD5STEP_F4(b, c, d, a, &in[ 9*4], &F4CONST[15*4], 21);
 
-	*(uint32_t *)(&digest[0])  += (a[0] | (a[1] << 8) | (a[2] << 16) | (a[3] << 24));
-	*(uint32_t *)(&digest[4])  += (b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24));
-	*(uint32_t *)(&digest[8])  += (c[0] | (c[1] << 8) | (c[2] << 16) | (c[3] << 24));
-	*(uint32_t *)(&digest[12]) += (d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24));
+	add32(&digest[0], a);
+	add32(&digest[4], b);
+	add32(&digest[8], c);
+	add32(&digest[12], d);
 }
 
 
