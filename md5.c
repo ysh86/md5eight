@@ -345,39 +345,71 @@ MD5Transform(const uint8_t in[64])
 }
 
 
-/* Simple test program.  Can use it to manually run the tests from
-   RFC1321 for example.  */
+/* Simple test program. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 int
 main (int argc, char **argv)
 {
-	int i;
 	int j;
-	uint32_t l;
-	uint8_t len[4];
-	const uint8_t *in;
 
 	if (argc < 2)
 	{
-		fprintf (stderr, "usage: %s string-to-hash\n", argv[0]);
+		fprintf (stderr, "usage: %s files-to-hash\n", argv[0]);
 		exit (1);
 	}
+
 	for (j = 1; j < argc; ++j)
 	{
-		printf ("MD5 (\"%s\") = ", argv[j]);
-		MD5Init ();
-		l = strlen (argv[j]);
+		int err;
+		size_t ret;
+		int i;
+
+		FILE *fp;
+		uint32_t l;
+		uint8_t len[4];
+		uint8_t *in;
+
+		fp = fopen(argv[j], "rb");
+		err = errno;
+		if (fp == NULL) {
+			fprintf(stderr, "%s\n", strerror(err));
+			exit(1);
+		}
+		l = 0;
+		if (fseek(fp, 0, SEEK_END) == 0) {
+			l = ftell(fp);
+			fseek(fp, 0, SEEK_SET);
+		}
+
+		in = malloc(l);
+		err = errno;
+		if (in == NULL) {
+			fprintf(stderr, "%s\n", strerror(err));
+			exit(1);
+		}
+		ret = fread(in, 1, l, fp);
+		err = errno;
+		if (ret != l) {
+			fprintf(stderr, "%s\n", strerror(err));
+			exit(1);
+		}
+		fclose(fp);
+
 		len[0] = l; len[1] = l >> 8; len[2] = l >> 16; len[3] = l >> 24;
-		in = (const uint8_t *) argv[j];
-		MD5Update (in, in + l);
-		MD5Final (len);
+		MD5Init();
+		MD5Update(in, in + l);
+		MD5Final(len);
+		free(in);
+
 		for (i = 0; i < 16; i++)
 		{
-			printf ("%02x", digest[i]);
+			printf("%02x", digest[i]);
 		}
-		printf ("\n");
+		printf("  %s\n", argv[j]);
 	}
+
 	return 0;
 }
