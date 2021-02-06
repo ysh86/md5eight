@@ -1,7 +1,4 @@
-#include <string.h>	/* for memcpy() */
-#include <stdint.h>
-
-static uint8_t F1CONST[] = {
+char F1CONST[16*4] = {
 0x78,0xa4,0x6a,0xd7,
 0x56,0xb7,0xc7,0xe8,
 0xdb,0x70,0x20,0x24,
@@ -19,7 +16,7 @@ static uint8_t F1CONST[] = {
 0x8e,0x43,0x79,0xa6,
 0x21,0x08,0xb4,0x49
 };
-static uint8_t F2CONST[] = {
+char F2CONST[16*4] = {
 0x62,0x25,0x1e,0xf6,
 0x40,0xb3,0x40,0xc0,
 0x51,0x5a,0x5e,0x26,
@@ -37,7 +34,7 @@ static uint8_t F2CONST[] = {
 0xd9,0x02,0x6f,0x67,
 0x8a,0x4c,0x2a,0x8d
 };
-static uint8_t F3CONST[] = {
+char F3CONST[16*4] = {
 0x42,0x39,0xfa,0xff,
 0x81,0xf6,0x71,0x87,
 0x22,0x61,0x9d,0x6d,
@@ -55,7 +52,7 @@ static uint8_t F3CONST[] = {
 0xf8,0x7c,0xa2,0x1f,
 0x65,0x56,0xac,0xc4
 };
-static uint8_t F4CONST[] = {
+char F4CONST[16*4] = {
 0x44,0x22,0x29,0xf4,
 0x97,0xff,0x2a,0x43,
 0xa7,0x23,0x94,0xab,
@@ -74,17 +71,29 @@ static uint8_t F4CONST[] = {
 0x91,0xd3,0x86,0xeb
 };
 
-uint8_t digest[4*4]; /* uint32_t le x4 */
-uint8_t buf[64];
+char digest[4*4]; /* uint32_t le x4 */
+char buf[64];
+char len[4];
+pnt len20;
+char d;
 
-void Transf (const uint8_t in[64]);
+proto char Transf:
+
+func char memset(pnt dst; char val; char len):
+char i;
+{
+	i = 0;
+	while (i < len) {
+		@(dst)[i] = val;
+		i += 1;
+	};
+}
 
 /*
  * Start MD5 accumulation.
  * Set buffer to mysterious initialization constants.
  */
-void
-Init()
+func char Init:
 {
 	digest[4*0+0] = 0x01; digest[4*0+1] = 0x23; digest[4*0+2] = 0x45; digest[4*0+3] = 0x67;
 	digest[4*1+0] = 0x89; digest[4*1+1] = 0xab; digest[4*1+2] = 0xcd; digest[4*1+3] = 0xef;
@@ -96,34 +105,33 @@ Init()
  * Update context to reflect the concatenation of another buffer full
  * of bytes.
  */
-void
-Update(const uint8_t *in, size_t length)
+func char Update(pnt in; pnt length):
+pnt l;
 {
 	/* Process data in 64-byte chunks */
 
-	size_t l = 0;
+	l = 0;
 	while (l + 64 <= length) {
 		Transf(in + l);
 		l += 64;
-	}
+	};
 
 	/* Handle any remaining bytes of data. */
 
-	memcpy(buf, in + l, length - l);
+	move(&buf, in + l, length - l);
 }
 
 /*
  * Final wrapup - pad to 64-byte boundary with the bit pattern
  * 1 0* (64-bit count of bits processed, MSB-first)
  */
-void
-Final(uint8_t len[4])
+func char Final(pnt len):
+char count;
+pnt p;
 {
-	uint8_t count;
-	uint8_t *p;
 
 	/* Compute number of bytes mod 64 */
-	count = len[0] & 0x3F;
+	count = @(len)[0] & 0x3F;
 
 	/* Set the first char of padding to 0x80.  This is safe since there is
 	   always at least one byte free */
@@ -137,144 +145,141 @@ Final(uint8_t len[4])
 	if (count < 8) {
 		/* Two lots of padding:  Pad the first block to 64 bytes */
 		memset(p, 0, count);
-		Transf(buf);
+		Transf(&buf);
 
 		/* Now fill the next block with 56 bytes */
-		memset(buf, 0, 56);
+		memset(&buf, 0, 56);
 	} else {
 		/* Pad block to 56 bytes */
 		memset(p, 0, count-8);
-	}
+	};
 
 	/* Append length in bits and transform */
 
-	buf[56+0] = len[0] << 3;
-	buf[56+1] = (len[1] << 3) | (len[0] >> 5);
-	buf[56+2] = (len[2] << 3) | (len[1] >> 5);
-	buf[56+3] = (len[3] << 3) | (len[2] >> 5);
-	buf[60+0] = len[3] >> 5;
+	buf[56+0] = @(len)[0] << 3;
+	buf[56+1] = (@(len)[1] << 3) | (@(len)[0] >> 5);
+	buf[56+2] = (@(len)[2] << 3) | (@(len)[1] >> 5);
+	buf[56+3] = (@(len)[3] << 3) | (@(len)[2] >> 5);
+	buf[60+0] = @(len)[3] >> 5;
 	buf[60+1] = 0;
 	buf[60+2] = 0;
 	buf[60+3] = 0;
-	Transf(buf);
+	Transf(&buf);
 }
 
 /* This is the central step in the MD5 algorithm. */
-uint8_t *add32(uint8_t a[4], const uint8_t b[4])
+func pnt add32(pnt a; pnt b):
+char t;
+char c;
 {
-	uint8_t t;
-	uint8_t c;
-
-	t = a[0] + b[0];
-	if (t < a[0]) {
+	t = @(a)[0] + @(b)[0];
+	if (t < @(a)[0]) {
 		c = 1;
 	} else {
 		c = 0;
-	}
-	a[0] = t;
+	};
+	@(a)[0] = t;
 
-	t = a[1] + b[1] + c;
+	t = @(a)[1] + @(b)[1] + c;
 	if (c == 0) {
-		if (t < a[1]) {
+		if (t < @(a)[1]) {
 			c = 1;
 		} else {
 			c = 0;
-		}
+		};
 	} else {
-		if (t <= a[1]) {
+		if (t <= @(a)[1]) {
 			c = 1;
 		} else {
 			c = 0;
-		}
-	}
-	a[1] = t;
+		};
+	};
+	@(a)[1] = t;
 
-	t = a[2] + b[2] + c;
+	t = @(a)[2] + @(b)[2] + c;
 	if (c == 0) {
-		if (t < a[2]) {
+		if (t < @(a)[2]) {
 			c = 1;
 		} else {
 			c = 0;
-		}
+		};
 	} else {
-		if (t <= a[2]) {
+		if (t <= @(a)[2]) {
 			c = 1;
 		} else {
 			c = 0;
-		}
-	}
-	a[2] = t;
+		};
+	};
+	@(a)[2] = t;
 
-	a[3] = a[3] + b[3] + c;
+	@(a)[3] = @(a)[3] + @(b)[3] + c;
 
 	return a;
 }
-void rotate(uint8_t a[4], uint8_t left)
+func char rotate(pnt a; pnt left):
+char l;
+char rm;
+char t, tt;
 {
-	uint8_t l = left >> 3;
-	uint8_t rm = left & 7;
-	uint8_t t, tt;
+	l = left >> 3;
+	rm = left & 7;
 
 	while (l > 0) {
-		t = a[3];
-		a[3] = a[2];
-		a[2] = a[1];
-		a[1] = a[0];
-		a[0] = t;
+		t = @(a)[3];
+		@(a)[3] = @(a)[2];
+		@(a)[2] = @(a)[1];
+		@(a)[1] = @(a)[0];
+		@(a)[0] = t;
 		l -= 1;
-	}
+	};
 
-	t = a[0] >> (8-rm);
-	a[0] = (a[0]<<rm) | (a[3] >> (8-rm));
-	tt = a[1] >> (8-rm);
-	a[1] = (a[1]<<rm) | t;
-	t = a[2] >> (8-rm);
-	a[2] = (a[2]<<rm) | tt;
-	a[3] = (a[3]<<rm) | t;
+	t = @(a)[0] >> (8-rm);
+	@(a)[0] = (@(a)[0]<<rm) | (@(a)[3] >> (8-rm));
+	tt = @(a)[1] >> (8-rm);
+	@(a)[1] = (@(a)[1]<<rm) | t;
+	t = @(a)[2] >> (8-rm);
+	@(a)[2] = (@(a)[2]<<rm) | tt;
+	@(a)[3] = (@(a)[3]<<rm) | t;
 }
-void MD5(uint8_t w[4], uint8_t t[4], const uint8_t data[4], const uint8_t cnst[4], const uint8_t x[4], uint8_t s)
+func char MD5(pnt w; pnt t; pnt data; pnt cnst; pnt x; char s):
 {
 	add32(w, add32(add32(t, data), cnst));
 	rotate(w, s);
 	add32(w, x);
 }
-void MD5F1(uint8_t w[4], uint8_t x[4], uint8_t y[4], uint8_t z[4], const uint8_t data[4], uint8_t cnst[4], uint8_t s)
+func char MD5F1(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
+char t[4];
 {
-	uint8_t t[4];
+	t[0] = @(y)[0] # @(z)[0]; t[1] = @(y)[1] # @(z)[1]; t[2] = @(y)[2] # @(z)[2]; t[3] = @(y)[3] # @(z)[3];
+	t[0] = @(x)[0] & t[0]; t[1] = @(x)[1] & t[1]; t[2] = @(x)[2] & t[2]; t[3] = @(x)[3] & t[3];
+	t[0] = @(z)[0] # t[0]; t[1] = @(z)[1] # t[1]; t[2] = @(z)[2] # t[2]; t[3] = @(z)[3] # t[3];
 
-	t[0] = y[0] ^ z[0]; t[1] = y[1] ^ z[1]; t[2] = y[2] ^ z[2]; t[3] = y[3] ^ z[3];
-	t[0] = x[0] & t[0]; t[1] = x[1] & t[1]; t[2] = x[2] & t[2]; t[3] = x[3] & t[3];
-	t[0] = z[0] ^ t[0]; t[1] = z[1] ^ t[1]; t[2] = z[2] ^ t[2]; t[3] = z[3] ^ t[3];
-
-	MD5(w, t, data, cnst, x, s);
+	MD5(w, &t, data, cnst, x, s);
 }
-void MD5F2(uint8_t w[4], uint8_t x[4], uint8_t y[4], uint8_t z[4], const uint8_t data[4], uint8_t cnst[4], uint8_t s)
+func char MD5F2(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
+char t[4];
 {
-	uint8_t t[4];
+	t[0] = @(x)[0] # @(y)[0]; t[1] = @(x)[1] # @(y)[1]; t[2] = @(x)[2] # @(y)[2]; t[3] = @(x)[3] # @(y)[3];
+	t[0] = @(z)[0] & t[0]; t[1] = @(z)[1] & t[1]; t[2] = @(z)[2] & t[2]; t[3] = @(z)[3] & t[3];
+	t[0] = @(y)[0] # t[0]; t[1] = @(y)[1] # t[1]; t[2] = @(y)[2] # t[2]; t[3] = @(y)[3] # t[3];
 
-	t[0] = x[0] ^ y[0]; t[1] = x[1] ^ y[1]; t[2] = x[2] ^ y[2]; t[3] = x[3] ^ y[3];
-	t[0] = z[0] & t[0]; t[1] = z[1] & t[1]; t[2] = z[2] & t[2]; t[3] = z[3] & t[3];
-	t[0] = y[0] ^ t[0]; t[1] = y[1] ^ t[1]; t[2] = y[2] ^ t[2]; t[3] = y[3] ^ t[3];
-
-	MD5(w, t, data, cnst, x, s);
+	MD5(w, &t, data, cnst, x, s);
 }
-void MD5F3(uint8_t w[4], uint8_t x[4], uint8_t y[4], uint8_t z[4], const uint8_t data[4], uint8_t cnst[4], uint8_t s)
+func char MD5F3(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
+char t[4];
 {
-	uint8_t t[4];
+	t[0] = @(x)[0] # @(y)[0]; t[1] = @(x)[1] # @(y)[1]; t[2] = @(x)[2] # @(y)[2]; t[3] = @(x)[3] # @(y)[3];
+	t[0] = t[0] # @(z)[0]; t[1] = t[1] # @(z)[1]; t[2] = t[2] # @(z)[2]; t[3] = t[3] # @(z)[3];
 
-	t[0] = x[0] ^ y[0]; t[1] = x[1] ^ y[1]; t[2] = x[2] ^ y[2]; t[3] = x[3] ^ y[3];
-	t[0] = t[0] ^ z[0]; t[1] = t[1] ^ z[1]; t[2] = t[2] ^ z[2]; t[3] = t[3] ^ z[3];
-
-	MD5(w, t, data, cnst, x, s);
+	MD5(w, &t, data, cnst, x, s);
 }
-void MD5F4(uint8_t w[4], uint8_t x[4], uint8_t y[4], uint8_t z[4], const uint8_t data[4], uint8_t cnst[4], uint8_t s)
+func char MD5F4(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
+char t[4];
 {
-	uint8_t t[4];
+	t[0] = @(x)[0] | ~@(z)[0]; t[1] = @(x)[1] | ~@(z)[1]; t[2] = @(x)[2] | ~@(z)[2]; t[3] = @(x)[3] | ~@(z)[3];
+	t[0] = @(y)[0] # t[0]; t[1] = @(y)[1] # t[1]; t[2] = @(y)[2] # t[2]; t[3] = @(y)[3] # t[3];
 
-	t[0] = x[0] | ~z[0]; t[1] = x[1] | ~z[1]; t[2] = x[2] | ~z[2]; t[3] = x[3] | ~z[3];
-	t[0] = y[0] ^  t[0]; t[1] = y[1] ^  t[1]; t[2] = y[2] ^  t[2]; t[3] = y[3] ^  t[3];
-
-	MD5(w, t, data, cnst, x, s);
+	MD5(w, &t, data, cnst, x, s);
 }
 
 /*
@@ -282,156 +287,103 @@ void MD5F4(uint8_t w[4], uint8_t x[4], uint8_t y[4], uint8_t z[4], const uint8_t
  * reflect the addition of 16 longwords of new data.  MD5Update blocks
  * the data and converts bytes into longwords for this routine.
  */
-void
-Transf(const uint8_t in[64])
+func char Transf(pnt in):
+char a[4], b[4], c[4], d[4];
 {
-	uint8_t a[4], b[4], c[4], d[4];
-
 	a[0] = digest[0 +0]; a[1] = digest[0 +1]; a[2] = digest[0 +2]; a[3] = digest[0 +3];
 	b[0] = digest[4 +0]; b[1] = digest[4 +1]; b[2] = digest[4 +2]; b[3] = digest[4 +3];
 	c[0] = digest[8 +0]; c[1] = digest[8 +1]; c[2] = digest[8 +2]; c[3] = digest[8 +3];
 	d[0] = digest[12+0]; d[1] = digest[12+1]; d[2] = digest[12+2]; d[3] = digest[12+3];
 
-	MD5F1(a, b, c, d, in + ( 0*4), &F1CONST[ 0*4],  7);
-	MD5F1(d, a, b, c, in + ( 1*4), &F1CONST[ 1*4], 12);
-	MD5F1(c, d, a, b, in + ( 2*4), &F1CONST[ 2*4], 17);
-	MD5F1(b, c, d, a, in + ( 3*4), &F1CONST[ 3*4], 22);
-	MD5F1(a, b, c, d, in + ( 4*4), &F1CONST[ 4*4],  7);
-	MD5F1(d, a, b, c, in + ( 5*4), &F1CONST[ 5*4], 12);
-	MD5F1(c, d, a, b, in + ( 6*4), &F1CONST[ 6*4], 17);
-	MD5F1(b, c, d, a, in + ( 7*4), &F1CONST[ 7*4], 22);
-	MD5F1(a, b, c, d, in + ( 8*4), &F1CONST[ 8*4],  7);
-	MD5F1(d, a, b, c, in + ( 9*4), &F1CONST[ 9*4], 12);
-	MD5F1(c, d, a, b, in + (10*4), &F1CONST[10*4], 17);
-	MD5F1(b, c, d, a, in + (11*4), &F1CONST[11*4], 22);
-	MD5F1(a, b, c, d, in + (12*4), &F1CONST[12*4],  7);
-	MD5F1(d, a, b, c, in + (13*4), &F1CONST[13*4], 12);
-	MD5F1(c, d, a, b, in + (14*4), &F1CONST[14*4], 17);
-	MD5F1(b, c, d, a, in + (15*4), &F1CONST[15*4], 22);
+	MD5F1(&a, &b, &c, &d, in + ( 0*4), &F1CONST[ 0*4],  7);
+	MD5F1(&d, &a, &b, &c, in + ( 1*4), &F1CONST[ 1*4], 12);
+	MD5F1(&c, &d, &a, &b, in + ( 2*4), &F1CONST[ 2*4], 17);
+	MD5F1(&b, &c, &d, &a, in + ( 3*4), &F1CONST[ 3*4], 22);
+	MD5F1(&a, &b, &c, &d, in + ( 4*4), &F1CONST[ 4*4],  7);
+	MD5F1(&d, &a, &b, &c, in + ( 5*4), &F1CONST[ 5*4], 12);
+	MD5F1(&c, &d, &a, &b, in + ( 6*4), &F1CONST[ 6*4], 17);
+	MD5F1(&b, &c, &d, &a, in + ( 7*4), &F1CONST[ 7*4], 22);
+	MD5F1(&a, &b, &c, &d, in + ( 8*4), &F1CONST[ 8*4],  7);
+	MD5F1(&d, &a, &b, &c, in + ( 9*4), &F1CONST[ 9*4], 12);
+	MD5F1(&c, &d, &a, &b, in + (10*4), &F1CONST[10*4], 17);
+	MD5F1(&b, &c, &d, &a, in + (11*4), &F1CONST[11*4], 22);
+	MD5F1(&a, &b, &c, &d, in + (12*4), &F1CONST[12*4],  7);
+	MD5F1(&d, &a, &b, &c, in + (13*4), &F1CONST[13*4], 12);
+	MD5F1(&c, &d, &a, &b, in + (14*4), &F1CONST[14*4], 17);
+	MD5F1(&b, &c, &d, &a, in + (15*4), &F1CONST[15*4], 22);
 
-	MD5F2(a, b, c, d, in + ( 1*4), &F2CONST[ 0*4],  5);
-	MD5F2(d, a, b, c, in + ( 6*4), &F2CONST[ 1*4],  9);
-	MD5F2(c, d, a, b, in + (11*4), &F2CONST[ 2*4], 14);
-	MD5F2(b, c, d, a, in + ( 0*4), &F2CONST[ 3*4], 20);
-	MD5F2(a, b, c, d, in + ( 5*4), &F2CONST[ 4*4],  5);
-	MD5F2(d, a, b, c, in + (10*4), &F2CONST[ 5*4],  9);
-	MD5F2(c, d, a, b, in + (15*4), &F2CONST[ 6*4], 14);
-	MD5F2(b, c, d, a, in + ( 4*4), &F2CONST[ 7*4], 20);
-	MD5F2(a, b, c, d, in + ( 9*4), &F2CONST[ 8*4],  5);
-	MD5F2(d, a, b, c, in + (14*4), &F2CONST[ 9*4],  9);
-	MD5F2(c, d, a, b, in + ( 3*4), &F2CONST[10*4], 14);
-	MD5F2(b, c, d, a, in + ( 8*4), &F2CONST[11*4], 20);
-	MD5F2(a, b, c, d, in + (13*4), &F2CONST[12*4],  5);
-	MD5F2(d, a, b, c, in + ( 2*4), &F2CONST[13*4],  9);
-	MD5F2(c, d, a, b, in + ( 7*4), &F2CONST[14*4], 14);
-	MD5F2(b, c, d, a, in + (12*4), &F2CONST[15*4], 20);
+	MD5F2(&a, &b, &c, &d, in + ( 1*4), &F2CONST[ 0*4],  5);
+	MD5F2(&d, &a, &b, &c, in + ( 6*4), &F2CONST[ 1*4],  9);
+	MD5F2(&c, &d, &a, &b, in + (11*4), &F2CONST[ 2*4], 14);
+	MD5F2(&b, &c, &d, &a, in + ( 0*4), &F2CONST[ 3*4], 20);
+	MD5F2(&a, &b, &c, &d, in + ( 5*4), &F2CONST[ 4*4],  5);
+	MD5F2(&d, &a, &b, &c, in + (10*4), &F2CONST[ 5*4],  9);
+	MD5F2(&c, &d, &a, &b, in + (15*4), &F2CONST[ 6*4], 14);
+	MD5F2(&b, &c, &d, &a, in + ( 4*4), &F2CONST[ 7*4], 20);
+	MD5F2(&a, &b, &c, &d, in + ( 9*4), &F2CONST[ 8*4],  5);
+	MD5F2(&d, &a, &b, &c, in + (14*4), &F2CONST[ 9*4],  9);
+	MD5F2(&c, &d, &a, &b, in + ( 3*4), &F2CONST[10*4], 14);
+	MD5F2(&b, &c, &d, &a, in + ( 8*4), &F2CONST[11*4], 20);
+	MD5F2(&a, &b, &c, &d, in + (13*4), &F2CONST[12*4],  5);
+	MD5F2(&d, &a, &b, &c, in + ( 2*4), &F2CONST[13*4],  9);
+	MD5F2(&c, &d, &a, &b, in + ( 7*4), &F2CONST[14*4], 14);
+	MD5F2(&b, &c, &d, &a, in + (12*4), &F2CONST[15*4], 20);
 
-	MD5F3(a, b, c, d, in + ( 5*4), &F3CONST[ 0*4],  4);
-	MD5F3(d, a, b, c, in + ( 8*4), &F3CONST[ 1*4], 11);
-	MD5F3(c, d, a, b, in + (11*4), &F3CONST[ 2*4], 16);
-	MD5F3(b, c, d, a, in + (14*4), &F3CONST[ 3*4], 23);
-	MD5F3(a, b, c, d, in + ( 1*4), &F3CONST[ 4*4],  4);
-	MD5F3(d, a, b, c, in + ( 4*4), &F3CONST[ 5*4], 11);
-	MD5F3(c, d, a, b, in + ( 7*4), &F3CONST[ 6*4], 16);
-	MD5F3(b, c, d, a, in + (10*4), &F3CONST[ 7*4], 23);
-	MD5F3(a, b, c, d, in + (13*4), &F3CONST[ 8*4],  4);
-	MD5F3(d, a, b, c, in + ( 0*4), &F3CONST[ 9*4], 11);
-	MD5F3(c, d, a, b, in + ( 3*4), &F3CONST[10*4], 16);
-	MD5F3(b, c, d, a, in + ( 6*4), &F3CONST[11*4], 23);
-	MD5F3(a, b, c, d, in + ( 9*4), &F3CONST[12*4],  4);
-	MD5F3(d, a, b, c, in + (12*4), &F3CONST[13*4], 11);
-	MD5F3(c, d, a, b, in + (15*4), &F3CONST[14*4], 16);
-	MD5F3(b, c, d, a, in + ( 2*4), &F3CONST[15*4], 23);
+	MD5F3(&a, &b, &c, &d, in + ( 5*4), &F3CONST[ 0*4],  4);
+	MD5F3(&d, &a, &b, &c, in + ( 8*4), &F3CONST[ 1*4], 11);
+	MD5F3(&c, &d, &a, &b, in + (11*4), &F3CONST[ 2*4], 16);
+	MD5F3(&b, &c, &d, &a, in + (14*4), &F3CONST[ 3*4], 23);
+	MD5F3(&a, &b, &c, &d, in + ( 1*4), &F3CONST[ 4*4],  4);
+	MD5F3(&d, &a, &b, &c, in + ( 4*4), &F3CONST[ 5*4], 11);
+	MD5F3(&c, &d, &a, &b, in + ( 7*4), &F3CONST[ 6*4], 16);
+	MD5F3(&b, &c, &d, &a, in + (10*4), &F3CONST[ 7*4], 23);
+	MD5F3(&a, &b, &c, &d, in + (13*4), &F3CONST[ 8*4],  4);
+	MD5F3(&d, &a, &b, &c, in + ( 0*4), &F3CONST[ 9*4], 11);
+	MD5F3(&c, &d, &a, &b, in + ( 3*4), &F3CONST[10*4], 16);
+	MD5F3(&b, &c, &d, &a, in + ( 6*4), &F3CONST[11*4], 23);
+	MD5F3(&a, &b, &c, &d, in + ( 9*4), &F3CONST[12*4],  4);
+	MD5F3(&d, &a, &b, &c, in + (12*4), &F3CONST[13*4], 11);
+	MD5F3(&c, &d, &a, &b, in + (15*4), &F3CONST[14*4], 16);
+	MD5F3(&b, &c, &d, &a, in + ( 2*4), &F3CONST[15*4], 23);
 
-	MD5F4(a, b, c, d, in + ( 0*4), &F4CONST[ 0*4],  6);
-	MD5F4(d, a, b, c, in + ( 7*4), &F4CONST[ 1*4], 10);
-	MD5F4(c, d, a, b, in + (14*4), &F4CONST[ 2*4], 15);
-	MD5F4(b, c, d, a, in + ( 5*4), &F4CONST[ 3*4], 21);
-	MD5F4(a, b, c, d, in + (12*4), &F4CONST[ 4*4],  6);
-	MD5F4(d, a, b, c, in + ( 3*4), &F4CONST[ 5*4], 10);
-	MD5F4(c, d, a, b, in + (10*4), &F4CONST[ 6*4], 15);
-	MD5F4(b, c, d, a, in + ( 1*4), &F4CONST[ 7*4], 21);
-	MD5F4(a, b, c, d, in + ( 8*4), &F4CONST[ 8*4],  6);
-	MD5F4(d, a, b, c, in + (15*4), &F4CONST[ 9*4], 10);
-	MD5F4(c, d, a, b, in + ( 6*4), &F4CONST[10*4], 15);
-	MD5F4(b, c, d, a, in + (13*4), &F4CONST[11*4], 21);
-	MD5F4(a, b, c, d, in + ( 4*4), &F4CONST[12*4],  6);
-	MD5F4(d, a, b, c, in + (11*4), &F4CONST[13*4], 10);
-	MD5F4(c, d, a, b, in + ( 2*4), &F4CONST[14*4], 15);
-	MD5F4(b, c, d, a, in + ( 9*4), &F4CONST[15*4], 21);
+	MD5F4(&a, &b, &c, &d, in + ( 0*4), &F4CONST[ 0*4],  6);
+	MD5F4(&d, &a, &b, &c, in + ( 7*4), &F4CONST[ 1*4], 10);
+	MD5F4(&c, &d, &a, &b, in + (14*4), &F4CONST[ 2*4], 15);
+	MD5F4(&b, &c, &d, &a, in + ( 5*4), &F4CONST[ 3*4], 21);
+	MD5F4(&a, &b, &c, &d, in + (12*4), &F4CONST[ 4*4],  6);
+	MD5F4(&d, &a, &b, &c, in + ( 3*4), &F4CONST[ 5*4], 10);
+	MD5F4(&c, &d, &a, &b, in + (10*4), &F4CONST[ 6*4], 15);
+	MD5F4(&b, &c, &d, &a, in + ( 1*4), &F4CONST[ 7*4], 21);
+	MD5F4(&a, &b, &c, &d, in + ( 8*4), &F4CONST[ 8*4],  6);
+	MD5F4(&d, &a, &b, &c, in + (15*4), &F4CONST[ 9*4], 10);
+	MD5F4(&c, &d, &a, &b, in + ( 6*4), &F4CONST[10*4], 15);
+	MD5F4(&b, &c, &d, &a, in + (13*4), &F4CONST[11*4], 21);
+	MD5F4(&a, &b, &c, &d, in + ( 4*4), &F4CONST[12*4],  6);
+	MD5F4(&d, &a, &b, &c, in + (11*4), &F4CONST[13*4], 10);
+	MD5F4(&c, &d, &a, &b, in + ( 2*4), &F4CONST[14*4], 15);
+	MD5F4(&b, &c, &d, &a, in + ( 9*4), &F4CONST[15*4], 21);
 
-	add32(digest+ 0, a);
-	add32(digest+ 4, b);
-	add32(digest+ 8, c);
-	add32(digest+12, d);
+	add32(&digest+ 0, &a);
+	add32(&digest+ 4, &b);
+	add32(&digest+ 8, &c);
+	add32(&digest+12, &d);
 }
 
 
 /* Simple test program. */
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-
-int
-main (int argc, char **argv)
 {
-	int j;
+	/* S3.ROM: 256KB = 0xC0000 - 0xFFFFF */
+	len20 = 0x04000;
+	len[0] = 0; len[1] = 0x40; len[2] = 0; len[3] = 0;
 
-	if (argc < 2)
-	{
-		fprintf (stderr, "usage: %s files-to-hash\n", argv[0]);
-		exit (1);
-	}
+	Init;
+	Update(0xC0000, len20);
+	Final(&len);
 
-	for (j = 1; j < argc; ++j)
-	{
-		int err;
-		size_t ret;
-		int i;
-
-		FILE *fp;
-		uint32_t l;
-		uint8_t len[4];
-		uint8_t *in;
-
-		fp = fopen(argv[j], "rb");
-		err = errno;
-		if (fp == NULL) {
-			fprintf(stderr, "%s\n", strerror(err));
-			exit(1);
-		}
-		l = 0;
-		if (fseek(fp, 0, SEEK_END) == 0) {
-			l = ftell(fp);
-			fseek(fp, 0, SEEK_SET);
-		}
-
-		in = malloc(l);
-		err = errno;
-		if (in == NULL) {
-			fprintf(stderr, "%s\n", strerror(err));
-			exit(1);
-		}
-		ret = fread(in, 1, l, fp);
-		err = errno;
-		if (ret != l) {
-			fprintf(stderr, "%s\n", strerror(err));
-			exit(1);
-		}
-		fclose(fp);
-
-		len[0] = l; len[1] = l >> 8; len[2] = l >> 16; len[3] = l >> 24;
-		Init();
-		Update(in, l);
-		Final(len);
-		free(in);
-
-		for (i = 0; i < 16; i++)
-		{
-			printf("%02x", digest[i]);
-		}
-		printf("  %s\n", argv[j]);
-	}
-
-	return 0;
+	d = 0;
+	do {
+		printf("%2x", digest[d]);
+		d += 1;
+	} until (d >= 16);
+	printf("  S3.ROM^M^J");
 }
