@@ -81,25 +81,25 @@ proto char Transf:
 
 func char memset(pnt dst; char val; char len):
 char i;
-{
+{[
 	i = 0;
 	while (i < len) {
 		@(dst)[i] = val;
 		i += 1;
 	};
-}
+];}
 
 /*
  * Start MD5 accumulation.
  * Set buffer to mysterious initialization constants.
  */
 func char Init:
-{
+{[
 	digest[4*0+0] = 0x01; digest[4*0+1] = 0x23; digest[4*0+2] = 0x45; digest[4*0+3] = 0x67;
 	digest[4*1+0] = 0x89; digest[4*1+1] = 0xab; digest[4*1+2] = 0xcd; digest[4*1+3] = 0xef;
 	digest[4*2+0] = 0xfe; digest[4*2+1] = 0xdc; digest[4*2+2] = 0xba; digest[4*2+3] = 0x98;
 	digest[4*3+0] = 0x76; digest[4*3+1] = 0x54; digest[4*3+2] = 0x32; digest[4*3+3] = 0x10;
-}
+];}
 
 /*
  * Update context to reflect the concatenation of another buffer full
@@ -107,7 +107,7 @@ func char Init:
  */
 func char Update(pnt in; pnt length):
 pnt l;
-{
+{[
 	/* Process data in 64-byte chunks */
 
 	l = 0;
@@ -119,7 +119,7 @@ pnt l;
 	/* Handle any remaining bytes of data. */
 
 	move(&buf, in + l, length - l);
-}
+];}
 
 /*
  * Final wrapup - pad to 64-byte boundary with the bit pattern
@@ -128,7 +128,7 @@ pnt l;
 func char Final(pnt len):
 char count;
 pnt p;
-{
+{[
 
 	/* Compute number of bytes mod 64 */
 	count = @(len)[0] & 0x3F;
@@ -165,13 +165,13 @@ pnt p;
 	buf[60+2] = 0;
 	buf[60+3] = 0;
 	Transf(&buf);
-}
+];}
 
 /* This is the central step in the MD5 algorithm. */
 func pnt add32(pnt a; pnt b):
 char t;
 char c;
-{
+{[
 	t = @(a)[0] + @(b)[0];
 	if (t < @(a)[0]) {
 		c = 1;
@@ -215,12 +215,12 @@ char c;
 	@(a)[3] = @(a)[3] + @(b)[3] + c;
 
 	return a;
-}
+];}
 func char rotate(pnt a; pnt left):
 char l;
 char rm;
 char t, tt;
-{
+{[
 	l = left >> 3;
 	rm = left & 7;
 
@@ -240,47 +240,47 @@ char t, tt;
 	t = @(a)[2] >> (8-rm);
 	@(a)[2] = (@(a)[2]<<rm) | tt;
 	@(a)[3] = (@(a)[3]<<rm) | t;
-}
+];}
 func char MD5(pnt w; pnt t; pnt data; pnt cnst; pnt x; char s):
-{
+{[
 	add32(w, add32(add32(t, data), cnst));
 	rotate(w, s);
 	add32(w, x);
-}
+];}
 func char MD5F1(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
 char t[4];
-{
+{[
 	t[0] = @(y)[0] # @(z)[0]; t[1] = @(y)[1] # @(z)[1]; t[2] = @(y)[2] # @(z)[2]; t[3] = @(y)[3] # @(z)[3];
 	t[0] = @(x)[0] & t[0]; t[1] = @(x)[1] & t[1]; t[2] = @(x)[2] & t[2]; t[3] = @(x)[3] & t[3];
 	t[0] = @(z)[0] # t[0]; t[1] = @(z)[1] # t[1]; t[2] = @(z)[2] # t[2]; t[3] = @(z)[3] # t[3];
 
 	MD5(w, &t, data, cnst, x, s);
-}
+];}
 func char MD5F2(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
 char t[4];
-{
+{[
 	t[0] = @(x)[0] # @(y)[0]; t[1] = @(x)[1] # @(y)[1]; t[2] = @(x)[2] # @(y)[2]; t[3] = @(x)[3] # @(y)[3];
 	t[0] = @(z)[0] & t[0]; t[1] = @(z)[1] & t[1]; t[2] = @(z)[2] & t[2]; t[3] = @(z)[3] & t[3];
 	t[0] = @(y)[0] # t[0]; t[1] = @(y)[1] # t[1]; t[2] = @(y)[2] # t[2]; t[3] = @(y)[3] # t[3];
 
 	MD5(w, &t, data, cnst, x, s);
-}
+];}
 func char MD5F3(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
 char t[4];
-{
+{[
 	t[0] = @(x)[0] # @(y)[0]; t[1] = @(x)[1] # @(y)[1]; t[2] = @(x)[2] # @(y)[2]; t[3] = @(x)[3] # @(y)[3];
 	t[0] = t[0] # @(z)[0]; t[1] = t[1] # @(z)[1]; t[2] = t[2] # @(z)[2]; t[3] = t[3] # @(z)[3];
 
 	MD5(w, &t, data, cnst, x, s);
-}
+];}
 func char MD5F4(pnt w; pnt x; pnt y; pnt z; pnt data; pnt cnst; char s):
 char t[4];
-{
+{[
 	t[0] = @(x)[0] | ~@(z)[0]; t[1] = @(x)[1] | ~@(z)[1]; t[2] = @(x)[2] | ~@(z)[2]; t[3] = @(x)[3] | ~@(z)[3];
 	t[0] = @(y)[0] # t[0]; t[1] = @(y)[1] # t[1]; t[2] = @(y)[2] # t[2]; t[3] = @(y)[3] # t[3];
 
 	MD5(w, &t, data, cnst, x, s);
-}
+];}
 
 /*
  * The core of the MD5 algorithm, this alters an existing MD5 hash to
@@ -289,7 +289,7 @@ char t[4];
  */
 func char Transf(pnt in):
 char a[4], b[4], c[4], d[4];
-{
+{[
 	a[0] = digest[0 +0]; a[1] = digest[0 +1]; a[2] = digest[0 +2]; a[3] = digest[0 +3];
 	b[0] = digest[4 +0]; b[1] = digest[4 +1]; b[2] = digest[4 +2]; b[3] = digest[4 +3];
 	c[0] = digest[8 +0]; c[1] = digest[8 +1]; c[2] = digest[8 +2]; c[3] = digest[8 +3];
@@ -367,11 +367,11 @@ char a[4], b[4], c[4], d[4];
 	add32(&digest+ 4, &b);
 	add32(&digest+ 8, &c);
 	add32(&digest+12, &d);
-}
+];}
 
 
 /* Simple test program. */
-{
+{[
 	/* S3.ROM: 256KB = 0xC0000 - 0xFFFFF */
 	len20 = 0x04000;
 	len[0] = 0; len[1] = 0x40; len[2] = 0; len[3] = 0;
@@ -386,4 +386,4 @@ char a[4], b[4], c[4], d[4];
 		d += 1;
 	} until (d >= 16);
 	printf("  S3.ROM^M^J");
-}
+];}
