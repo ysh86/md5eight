@@ -114,6 +114,11 @@ pnt l;
 	while (l + 64 <= length) {
 		Transf(in + l);
 		l += 64;
+
+		/* progress */
+		if (l & 0x3fff == 0) {
+			printf("%d: %x, %x^M^J", l >> 14, l, in + l);
+		};
 	};
 
 	/* Handle any remaining bytes of data. */
@@ -373,8 +378,8 @@ char a[4], b[4], c[4], d[4];
 /* Simple test program. */
 {[
 	/* S3.ROM: 256KB = 0xC0000 - 0xFFFFF */
-	len20 = 0x04000;
-	len[0] = 0; len[1] = 0x40; len[2] = 0; len[3] = 0;
+	len20 = 0x40000;
+	len[0] = 0; len[1] = 0; len[2] = 4; len[3] = 0;
 
 	Init;
 	Update(0xC0000, len20);
